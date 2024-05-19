@@ -4,7 +4,7 @@ FROM python:3.9-slim
 # Set the working directory in the container
 WORKDIR /app
 
-# Install system dependencies
+# Install git and system dependencies
 RUN apt-get update && apt-get install -y git
 
 # Copy the current directory contents into the container at /app
@@ -23,5 +23,5 @@ EXPOSE 8000
 # Define environment variable for model path
 ENV MODEL_PATH=/path/to/model
 
-# Run the application when the container launches
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Command to run the application
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
