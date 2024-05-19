@@ -38,7 +38,7 @@ class ImageData(BaseModel):
     image_bytes: str
 
 @app.post("/unsafe-image-classification/")
-async def classify_image(image_data: ImageData, api_key: str = Depends(get_api_key) if API_KEYS else None):    try:
+async def classify_image(image_data: ImageData, api_key: str = Depends(get_api_key) if API_KEYS else None):
     try:
         image_bytes = base64.b64decode(image_data.image_bytes)
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
