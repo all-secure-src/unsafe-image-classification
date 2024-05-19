@@ -7,6 +7,7 @@ import torch
 from transformers import AutoModelForImageClassification, ViTImageProcessor
 import os
 import base64
+import re
 
 # Retrieve API keys from environment variable, split by comma, filter valid keys
 api_keys_raw = os.getenv("API_KEYS", "")
