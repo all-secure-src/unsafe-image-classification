@@ -8,26 +8,23 @@ from transformers import AutoModelForImageClassification, ViTImageProcessor
 import os
 import base64
 
-# API keys with their types
-API_KEYS = {
-    "api_key_123r": {"type": "testing"},
-    "api_key_123y": {"type": "testing"},
-    "api_key_127r": {"type": "production"},
-    "api_key_127m": {"type": "staging"}
-}
+# Retrieve API keys from environment variable, split by comma, filter valid keys
+api_keys_raw = os.getenv("API_KEYS", "")
+API_KEYS = {key: {'type': 'standard'} for key in api_keys_raw.split(',') if len(key) == 32 and re.match(r'^[a-zA-Z0-9]+$', key)}
 
 api_key_header = APIKeyHeader(name="X-API-Key")
 
 def get_api_key(api_key: str = Depends(api_key_header)):
-    if api_key not in API_KEYS:
+    if API_KEYS and (api_key not in API_KEYS):
         raise HTTPException(status_code=403, detail="Invalid API Key")
-    return API_KEYS[api_key]['type']
+    return api_key
 
 # Check for GPU availability and set up DataParallel if multiple GPUs are available
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model_path = os.getenv("MODEL_PATH", "unsafe-image-classification")
 token = os.getenv("TOKEN", "")
-print("Args: ", {"model_path": model_path, "token": token})
+print("Args: ", {"MODEL_PATH": model_path, "TOKEN": token, "API_KEY": "true" if API_KEYS else "false"})
+
 
 model = AutoModelForImageClassification.from_pretrained(model_path, torch_dtype=torch.float16, token=token)
 if torch.cuda.device_count() > 1:
@@ -41,7 +38,7 @@ class ImageData(BaseModel):
     image_bytes: str
 
 @app.post("/unsafe-image-classification/")
-async def classify_image(image_data: ImageData, api_key_type: str = Depends(get_api_key)):
+async def classify_image(image_data: ImageData, api_key: str = Depends(get_api_key) if API_KEYS else None):    try:
     try:
         image_bytes = base64.b64decode(image_data.image_bytes)
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
