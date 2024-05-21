@@ -35,6 +35,10 @@ processor = ViTImageProcessor.from_pretrained(model_path, torch_dtype=torch.floa
 
 app = FastAPI()
 
+@app.get("/health")
+async def health_check():
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"status": "healthy"})
+
 class ImageData(BaseModel):
     image_bytes: str
 
