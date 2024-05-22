@@ -24,7 +24,7 @@ def get_api_key(api_key: str = Depends(api_key_header)):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model_path = os.getenv("MODEL_PATH", "unsafe-image-classification")
 token = os.getenv("TOKEN", "")
-print("Args: ", {"MODEL_PATH": model_path, "TOKEN": token, "API_KEY": "true" if API_KEYS else "false"})
+print("Args: ", {"MODEL_PATH": model_path, "TOKEN": token, "API_KEY": "true" if API_KEYS else "false", "device": device})
 
 
 model = AutoModelForImageClassification.from_pretrained(model_path, torch_dtype=torch.float16, token=token)
@@ -37,7 +37,9 @@ app = FastAPI()
 
 @app.get("/health")
 async def health_check():
-    return JSONResponse(status_code=status.HTTP_200_OK, content={"status": "healthy"})
+    return return {
+            "status": "online",
+        }
 
 class ImageData(BaseModel):
     image_bytes: str
