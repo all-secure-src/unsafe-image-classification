@@ -42,27 +42,41 @@ async def health_check():
         }
 
 class ImageData(BaseModel):
-    image_bytes: str
+    image_bytes: Union[str, List[str]]
 
 @app.post("/unsafe-image-classification/")
 async def classify_image(image_data: ImageData, api_key: str = Depends(get_api_key) if API_KEYS else None):
     try:
-        image_bytes = base64.b64decode(image_data.image_bytes)
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        inputs = processor(images=image, return_tensors="pt").to(device)
-        
-        with torch.no_grad():
-            outputs = model(**inputs)
-            logits = outputs.logits
-            probabilities = torch.nn.functional.softmax(logits, dim=-1).cpu().numpy()
+        if isinstance(image_data.image_bytes, str):
+            image_bytes_list = [image_data.image_bytes]
+        elif isinstance(image_data.image_bytes, list):
+            if len(image_data.image_bytes) > 4:
+                raise HTTPException(status_code=400, detail="Too many images provided. Maximum allowed is 4.")
+            image_bytes_list = image_data.image_bytes
+        else:
+            raise HTTPException(status_code=400, detail="Invalid input type for image data.")
 
-        safe_score, unsafe_score = probabilities[0]
-        final_result = "unsafe" if unsafe_score > safe_score else "safe"
+        results = []
+        for idx, image_bytes in enumerate(image_bytes_list):
+            image_bytes = base64.b64decode(image_bytes)
+            image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+            inputs = processor(images=image, return_tensors="pt").to(device)
 
-        return {
-            "label": final_result,
-            "score": {"safe": float(safe_score), "unsafe": float(unsafe_score)}
-        }
+            with torch.no_grad():
+                outputs = model(**inputs)
+                logits = outputs.logits
+                probabilities = torch.nn.functional.softmax(logits, dim=-1).cpu().numpy()
+
+            safe_score, unsafe_score = probabilities[0]
+            final_result = "unsafe" if unsafe_score > safe_score else "safe"
+
+            results.append({
+                "index": idx,
+                "label": final_result,
+                "score": {"safe": float(safe_score), "unsafe": float(unsafe_score)}
+            })
+
+        return results
 
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
