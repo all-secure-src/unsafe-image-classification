@@ -3,6 +3,7 @@ from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, HttpUrl
 from typing import Union, List
 from PIL import Image
+import requests
 import io
 import torch
 from transformers import AutoModelForImageClassification, ViTImageProcessor
@@ -48,14 +49,10 @@ class ImageData(BaseModel):
 @app.post("/unsafe-image-classification/")
 async def classify_image(image_data: ImageData, api_key: str = Depends(get_api_key) if API_KEYS else None):
     try:
-        if isinstance(image_data.images, HttpUrl):
-            image_urls_list = [image_data.images]
-        elif isinstance(image_data.images, list):
-            if len(image_data.images) > 4:
-                raise HTTPException(status_code=400, detail="Too many images provided. Maximum allowed is 4.")
-            image_urls_list = image_data.images
-        else:
-            raise HTTPException(status_code=400, detail="Invalid input type for image data.")
+        image_urls_list = image_data.images if isinstance(image_data.images, list) else [image_data.images]
+
+        if len(image_urls_list) > 4:
+            raise HTTPException(status_code=400, detail="Too many images provided. Maximum allowed is 4.")
 
         results = []
         for idx, image_url in enumerate(image_urls_list):
@@ -75,12 +72,12 @@ async def classify_image(image_data: ImageData, api_key: str = Depends(get_api_k
 
             results.append({
                 "index": idx,
+                "image": image_url,
                 "label": final_result,
                 "score": {"safe": float(safe_score), "unsafe": float(unsafe_score)}
             })
 
         return results
-
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except IOError:
