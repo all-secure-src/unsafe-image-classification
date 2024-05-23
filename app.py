@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import APIKeyHeader
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from typing import Union, List
 from PIL import Image
 import io
@@ -43,24 +43,26 @@ async def health_check():
         }
 
 class ImageData(BaseModel):
-    image_bytes: Union[str, List[str]]
+    images: Union[HttpUrl, List[HttpUrl]]
 
 @app.post("/unsafe-image-classification/")
 async def classify_image(image_data: ImageData, api_key: str = Depends(get_api_key) if API_KEYS else None):
     try:
-        if isinstance(image_data.image_bytes, str):
-            image_bytes_list = [image_data.image_bytes]
-        elif isinstance(image_data.image_bytes, list):
-            if len(image_data.image_bytes) > 4:
+        if isinstance(image_data.images, HttpUrl):
+            image_urls_list = [image_data.images]
+        elif isinstance(image_data.images, list):
+            if len(image_data.images) > 4:
                 raise HTTPException(status_code=400, detail="Too many images provided. Maximum allowed is 4.")
-            image_bytes_list = image_data.image_bytes
+            image_urls_list = image_data.images
         else:
             raise HTTPException(status_code=400, detail="Invalid input type for image data.")
 
         results = []
-        for idx, image_bytes in enumerate(image_bytes_list):
-            image_bytes = base64.b64decode(image_bytes)
-            image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        for idx, image_url in enumerate(image_urls_list):
+            response = requests.get(image_url)
+            if response.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"Unable to fetch image from URL: {image_url}")
+            image = Image.open(io.BytesIO(response.content)).convert("RGB")
             inputs = processor(images=image, return_tensors="pt").to(device)
 
             with torch.no_grad():
